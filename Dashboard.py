@@ -78,21 +78,28 @@ def machine_info_page():
             messages = response.json()["messages"]
 
             for msg in messages:
-                # Log format = date | content-type | text | filename
+                # Split line by '|', flexible handling
                 parts = [x.strip() for x in msg.split("|")]
 
-                # Skip invalid lines
-                if len(parts) != 4:
-                    st.warning(f"Skipped invalid log line:\n{msg}")
-                    st.divider()
-                    continue
+                # Defaults
+                date_str = ""
+                content_type = ""
+                text = ""
+                filename = "no image"
 
-                date_str, content_type, text, filename = parts
+                if len(parts) >= 1:
+                    date_str = parts[0]
+                if len(parts) >= 2:
+                    content_type = parts[1]
+                if len(parts) >= 3:
+                    text = " | ".join(parts[2:-1]) if len(parts) > 3 else parts[2]
+                if len(parts) >= 4:
+                    filename = parts[-1]
 
-                # Format date
+                # Format date safely
                 try:
                     dt = datetime.datetime.strptime(date_str, "%Y-%m-%d %H:%M:%S.%f")
-                    dt = dt + datetime.timedelta(hours=1)  # Adjust timezone
+                    dt = dt + datetime.timedelta(hours=1)
                     formatted_date = dt.strftime("%d %b %Y, %H:%M")
                 except:
                     formatted_date = date_str
@@ -101,7 +108,7 @@ def machine_info_page():
                 st.text(f"📄 Type: {content_type}")
                 st.text(f"📝 Text: {text}")
 
-                # File handling
+                # Display file if exists
                 if filename != "no image":
                     file_res = requests.get(
                         f"{SERVER_URL}/uploads/{filename}",
@@ -110,15 +117,12 @@ def machine_info_page():
 
                     if file_res.status_code == 200:
                         file_bytes = file_res.content
-
-                        # Display JSON nicely
                         if filename.lower().endswith(".json"):
                             try:
                                 st.json(json.loads(file_bytes.decode("utf-8")))
                             except:
                                 st.text(file_bytes.decode("utf-8"))
                         else:
-                            # Display as image if it's an image
                             st.image(file_bytes, caption=filename)
                     else:
                         st.error("⚠ Failed to fetch file")
